@@ -1,0 +1,72 @@
+-- RXNCONSO：概念/字串主表
+DROP TABLE IF EXISTS RXNCONSO;
+CREATE TABLE RXNCONSO (
+  RXCUI    TEXT,
+  LAT      TEXT,
+  TS       TEXT,
+  LUI      TEXT,
+  STT      TEXT,
+  SUI      TEXT,
+  ISPREF   TEXT,
+  RXAUI    TEXT,
+  SAUI     TEXT,
+  SCUI     TEXT,
+  SDUI     TEXT,
+  SAB      TEXT,
+  TTY      TEXT,
+  CODE     TEXT,
+  STR      TEXT,
+  SRL      TEXT,
+  SUPPRESS TEXT,
+  CVF      TEXT
+);
+
+-- RXNREL：概念關係
+DROP TABLE IF EXISTS RXNREL;
+CREATE TABLE RXNREL (
+  RXCUI1   TEXT,
+  RXAUI1   TEXT,
+  STYPE1   TEXT,
+  REL      TEXT,
+  RXCUI2   TEXT,
+  RXAUI2   TEXT,
+  STYPE2   TEXT,
+  RELA     TEXT,
+  RUI      TEXT,
+  SRUI     TEXT,
+  SAB      TEXT,
+  SL       TEXT,
+  DIR      TEXT,
+  RG       TEXT,
+  SUPPRESS TEXT,
+  CVF      TEXT
+);
+
+-- RXNSAT：屬性
+DROP TABLE IF EXISTS RXNSAT;
+CREATE TABLE RXNSAT (
+  RXCUI    TEXT,
+  LUI      TEXT,
+  SUI      TEXT,
+  RXAUI    TEXT,
+  STYPE    TEXT,
+  CODE     TEXT,
+  ATUI     TEXT,
+  SATUI    TEXT,
+  ATN      TEXT,
+  SAB      TEXT,
+  ATV      TEXT,
+  SUPPRESS TEXT,
+  CVF      TEXT
+);
+
+--（如果有）語意型：RXNSTY
+DROP TABLE IF EXISTS RXNSTY;
+CREATE TABLE RXNSTY (
+  RXCUI TEXT,
+  TUI   TEXT,
+  STN   TEXT,
+  STY   TEXT,
+  ATUI  TEXT,
+  CVF   TEXT
+);

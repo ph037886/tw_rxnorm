@@ -43,3 +43,29 @@ tfda_to_content=pd.read_sql(sql_tfda_to_content, conn)
 need_medication=pd.merge(need_medication,tfda_to_content,how='left',on='許可證字號')
 # FDA的成分表裡面會有重複的資料
 need_medication=need_medication.drop_duplicates(subset=['許可證字號','成分名稱','含量', '含量單位'])
+need_medication=need_medication.dropna(subset='成分名稱')
+
+def find_rxcui(tty_type, keyword):
+    #rxnom sqlite link
+    rxnorm_conn=sqlite3.connect('files/rxnorm_prescribe.db')
+    sql_in="""
+    SELECT RXCUI
+    FROM RXNCONSO
+    WHERE TTY='tty_type'
+    AND UPPER(STR) like UPPER('%keyword%')"""
+    #keyword='rosuvastatin calcium'
+    sql_in=sql_in.replace('keyword',keyword)
+    sql_in=sql_in.replace('tty_type',tty_type)
+    in_df=pd.read_sql(sql_in, rxnorm_conn)
+    return in_df
+
+def add_rxcui(row):
+    keyword=row['成分名稱']
+    tty_type='PIN'
+    in_df=find_rxcui(tty_type, keyword)
+    if in_df.empty==False:
+        return in_df['RXCUI'].iloc[0]
+    else:
+        return None
+
+need_medication['PIN']=need_medication.apply(add_rxcui,axis=1)
