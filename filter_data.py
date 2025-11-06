@@ -5,12 +5,13 @@ need_medication=pd.read_excel(r'files/健保碼與許可證.xlsx')
 
 conn=sqlite3.connect(r'files/med_info.db')
 
-sql="""
+sql_nih_to_tfda="""
 SELECT 藥品代號
 , 許可證字號
+, 單複方
 FROM 健保藥品清單"""
 
-nih_to_tfda=pd.read_sql(sql,conn)
+nih_to_tfda=pd.read_sql(sql_nih_to_tfda,conn)
 
 #先把許可證字號串起來
 need_medication=pd.merge(need_medication,nih_to_tfda,how='left',left_on='健保碼', right_on='藥品代號')
@@ -23,3 +24,22 @@ need_medication2['許可證字號']=need_medication2['許可證字號_HIS']
 need_medication2=need_medication2[need_medication2['許可證字號']!=' ']
 
 need_medication=pd.concat([need_medication[~need_medication['許可證字號'].isnull()],need_medication2])
+
+#簡化條件，先做單方
+need_medication=need_medication[need_medication['單複方']=='單方']
+
+sql_tfda_to_content="""
+SELECT 成分名稱
+, 成分代碼
+, 含量
+, 含量單位
+, 許可證字號
+FROM 詳細處方成分"""
+
+tfda_to_content=pd.read_sql(sql_tfda_to_content, conn)
+
+
+
+need_medication=pd.merge(need_medication,tfda_to_content,how='left',on='許可證字號')
+# FDA的成分表裡面會有重複的資料
+need_medication=need_medication.drop_duplicates(subset=['許可證字號','成分名稱','含量', '含量單位'])
