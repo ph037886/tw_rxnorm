@@ -59,13 +59,38 @@ def find_rxcui(tty_type, keyword):
     in_df=pd.read_sql(sql_in, rxnorm_conn)
     return in_df
 
-def add_rxcui(row):
-    keyword=row['成分名稱']
-    tty_type='PIN'
+def add_rxcui_in_pin_scdc(row, tty_type):
+    if tty_type=='SCDC':
+        try: #有些含量會是空白，用try去迴避
+            dose=float(row['含量'])
+            if dose.is_integer()==True: #整數的時候刪掉.0的部分
+                dose=str(int(dose))
+            else:
+                dose=str(dose)
+            keyword=row['成分名稱']+' '+ dose + ' ' + row['含量單位']
+            print(keyword)
+        except Exception as e:
+            row['error']='SCDC error: ' + e
+            return row
+    elif (tty_type=='IN') or (tty_type=='PIN'):
+        keyword=row['成分名稱']
+    #tty_type='PIN'
     in_df=find_rxcui(tty_type, keyword)
     if in_df.empty==False:
-        return in_df['RXCUI'].iloc[0]
+        row[tty_type]= in_df['RXCUI'].iloc[0]
     else:
-        return None
+        row[tty_type]=None
+    return row
 
-need_medication['PIN']=need_medication.apply(add_rxcui,axis=1)
+def find_without_rxnorm_db(row):
+    keyword=row['成分名稱']
+    keyword=keyword.replace(' ', '+')
+    #解析XML部分代處理
+    get_rxcui=f'https://rxnav.nlm.nih.gov/REST/rxcui?name={keyword}&search=1'
+    get_tty=f'https://rxnav.nlm.nih.gov/REST/rxcui/{get_rxcui}/properties'
+
+need_medication=need_medication.apply(add_rxcui_in_pin,args=('IN',),axis=1)
+need_medication=need_medication.apply(add_rxcui_in_pin,args=('PIN',),axis=1)
+need_medication=need_medication.apply(add_rxcui_in_pin,args=('SCDC',),axis=1)
+
+
