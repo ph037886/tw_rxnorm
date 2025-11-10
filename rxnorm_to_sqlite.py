@@ -4,7 +4,7 @@ from pathlib import Path
 # 使用方式：python load_rxnorm_to_sqlite.py /path/to/rrf rxnorm_prescribe.db
 #rrf_dir = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("rrf")
 #db_path = sys.argv[2] if len(sys.argv) > 2 else "rxnorm_prescribe.db"
-rrf_dir = Path(r'C:\Users\cjs01\Downloads\RxNorm_full_prescribe_10062025\rrf')
+rrf_dir = Path(r'files\RxNorm_full_prescribe_10062025\rrf')
 db_path = "files/rxnorm_prescribe.db"
 
 def ensure_table(conn, table, n_cols):

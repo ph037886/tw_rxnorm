@@ -1,5 +1,7 @@
 import pandas as pd
 import sqlite3
+import requests
+from xml.etree import ElementTree
 
 need_medication=pd.read_excel(r'files/健保碼與許可證.xlsx')
 
@@ -68,9 +70,8 @@ def add_rxcui_in_pin_scdc(row, tty_type):
             else:
                 dose=str(dose)
             keyword=row['成分名稱']+' '+ dose + ' ' + row['含量單位']
-            print(keyword)
         except Exception as e:
-            row['error']='SCDC error: ' + e
+            row['error']='SCDC error: ' + str(e)
             return row
     elif (tty_type=='IN') or (tty_type=='PIN'):
         keyword=row['成分名稱']
@@ -82,15 +83,37 @@ def add_rxcui_in_pin_scdc(row, tty_type):
         row[tty_type]=None
     return row
 
-def find_without_rxnorm_db(row):
-    keyword=row['成分名稱']
-    keyword=keyword.replace(' ', '+')
-    #解析XML部分代處理
-    get_rxcui=f'https://rxnav.nlm.nih.gov/REST/rxcui?name={keyword}&search=1'
-    get_tty=f'https://rxnav.nlm.nih.gov/REST/rxcui/{get_rxcui}/properties'
+def get_text_using_node_from_url(url: str, node: str):
+    """使用requests由網址取得xml，並搜尋特定節點文字
+    url: 網址
+    node: xml的節點"""
+    response=requests.get(url)
+    root=ElementTree.fromstring(response.text)
+    if root.find(node) is not None:
+        return root.find(node).text
+    else:
+        return None
 
-need_medication=need_medication.apply(add_rxcui_in_pin,args=('IN',),axis=1)
-need_medication=need_medication.apply(add_rxcui_in_pin,args=('PIN',),axis=1)
-need_medication=need_medication.apply(add_rxcui_in_pin,args=('SCDC',),axis=1)
+def find_without_rxnorm_db(row):
+    if (row['IN']==None) & (row['PIN']==None) & (row['SCDC']==None):
+        keyword=row['成分名稱']
+        print(keyword)
+        keyword=keyword.replace(' ', '+')
+        #解析XML部分代處理
+        get_rxcui=f'https://rxnav.nlm.nih.gov/REST/rxcui?name={keyword}&search=1'
+        rxcui=get_text_using_node_from_url(get_rxcui,'.//rxnormId')
+        if rxcui is not None:
+            get_tty=f'https://rxnav.nlm.nih.gov/REST/rxcui/{rxcui}/properties'
+            tty=get_text_using_node_from_url(get_tty,'.//tty')
+            print(tty)
+            print(rxcui)
+            row[tty]=rxcui
+    return row
+
+need_medication=need_medication.apply(add_rxcui_in_pin_scdc,args=('IN',),axis=1)
+need_medication=need_medication.apply(add_rxcui_in_pin_scdc,args=('PIN',),axis=1)
+need_medication=need_medication.apply(add_rxcui_in_pin_scdc,args=('SCDC',),axis=1)
+
+need_medication=need_medication.head(1).apply(find_without_rxnorm_db, axis=1)
 
 
