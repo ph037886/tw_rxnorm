@@ -61,6 +61,10 @@ def find_rxcui(tty_type, keyword):
     return in_df
 
 def add_rxcui_in_pin_scdc(row, tty_type):
+    if tty_type in row.index.tolist(): #先判斷dataframe的column有沒有tty
+        if row.isna()[tty_type]!=True: #在判斷tty裡面有沒有資料，有的化先不取代，也不做後續
+            row['error']=tty_type + '已存在資料'
+            return row
     if tty_type=='SCDC':
         try: #有些含量會是空白，用try去迴避
             dose=float(row['含量'])
@@ -166,7 +170,11 @@ def for_complex_contain(need_medication):
                 .reset_index()
                 .rename(columns={"成分名稱": "成分串接"}))
     need_medication_grouped=need_medication_grouped.apply(add_rxcui_in_pin_scdc,args=('MIN',),axis=1)
-    #先筆記一下，這個方法找出來的MIN只有8個，主要應該是因為MIN的的成分通常沒有鹽基，但TFDA的資料幾乎都有鹽基
-    #可能的解決方法
-    #1. 用單方查好的IN去找MIN
-    #2. 用split把鹽基去掉
+    #筆記一下目前試過的方法
+    #1. 把複方的成分串接之後丟上去查MIN，找出來的MIN只有8個，，主要應該是因為MIN的的成分通常沒有鹽基，但TFDA的資料幾乎都有鹽基
+    #2. 用FDA api https://lhncbc.nlm.nih.gov/RxNav/APIs/api-RxNorm.getMultiIngredBrand.html
+    #   查商品名的API，這個會有的問題是它會查出包含輸入成分的美國商品名，但是不是完全相同，可能會發生台灣有個商品包含2個成分，但美國有某個商品包含有3個，其中有那兩個
+    #   錯誤舉例： 衛署藥輸字第023964號 成分：lidocaine / neomycin / polymyxin B，結果： https://rxnav.nlm.nih.gov/REST/brands?ingredientids=8536+7299+6387
+    #   但是這個品項是有四個成分的1089096，成分：bacitracin / lidocaine / neomycin / polymyxin B
+    #
+    #   目前覺得：先把單方的IN都先處理好，在merge給複方，複方變成要逐一去查IN PIN MIN
