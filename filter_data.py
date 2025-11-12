@@ -80,8 +80,6 @@ def add_rxcui_in_pin_scdc(row, tty_type):
     in_df=find_rxcui(tty_type, keyword)
     if in_df.empty==False:
         row[tty_type]= in_df['RXCUI'].iloc[0]
-    else:
-        row[tty_type]=None
     return row
 
 def get_text_using_node_from_url(url: str, node: str):
@@ -97,7 +95,7 @@ def get_text_using_node_from_url(url: str, node: str):
 
 def find_without_rxnorm_db(row):
     #沒有資料才做
-    if (row['IN']==None) & (row['PIN']==None) & (row['SCDC']==None):
+    if (row.isna()['IN']==True) & (row.isna()['PIN']==True) & (row.isna()['SCDC']==True):
         keyword=row['成分名稱']
         #依規則文字處理
         keyword=keyword.replace(' ', '+')
@@ -110,6 +108,32 @@ def find_without_rxnorm_db(row):
             tty=get_text_using_node_from_url(get_tty,'.//tty')
             row[tty]=rxcui
     return row
+
+def fill_in_pin(row):#用PIN和SCDC把IN或PIN加回去
+    def requests_in_pin(row, tty_term):
+        key_rxcui=row[tty_term]
+        url=f'https://rxnav.nlm.nih.gov/REST/rxcui/{key_rxcui}/related.xml?tty=IN+PIN'
+        try:
+            response=requests.get(url)
+            root=ElementTree.fromstring(response.text)
+            _dict=dict()
+            for term in root.findall('.//conceptProperties'):
+                tty=term.find('.//tty').text
+                rxcui=term.find('.//rxcui').text
+                if (tty=='PIN') & (row.isna()['PIN']==False) & (row['PIN']!=rxcui): #確認PIN在復原得時候有沒有和之前查出來的結果不一樣
+                    row['error']='API PIN is ' + rxcui
+                row[tty]=rxcui
+        except Exception as e:
+            print(url)
+            print(e)
+            print(row['許可證字號'])
+        return row
+    if (row.isna()['PIN']==True) & (row.isna()['SCDC']==True): #PIN和SDC都沒有，就pass
+        return row
+    elif (row.isna()['SCDC']==False): #有SCDC的時候用SCDC做
+        return requests_in_pin(row, 'SCDC')
+    elif (row.isna()['PIN']==False): #用PIN做
+        return requests_in_pin(row, 'PIN')
 
 def for_single_contain(need_medication):
     """單方可以先串上FDA的含量資料後，可以依序查詢
@@ -128,19 +152,21 @@ def for_single_contain(need_medication):
     need_medication=need_medication.apply(add_rxcui_in_pin_scdc,args=('SCDC',),axis=1)
 
     need_medication=need_medication.apply(find_without_rxnorm_db, axis=1)
+    need_medication=need_medication.apply(fill_in_pin, axis=1)
     return need_medication
     #need_medication=pd.read_pickle('files/temp_single_contain.pkl')
 
-#複方應該要用許可證字號做group去分每個group操作
-need_medication=need_medication[need_medication['單複方']=='複方']
-need_medication=merge_contain_dose_from_tfda(need_medication)
-need_medication_grouped = (need_medication.groupby("許可證字號")["成分名稱"]
-             .agg(lambda x: " / ".join(sorted(pd.Series(x).unique(), key=str.lower)))
-             #              分隔字符       不區分大小寫排序   排除重複
-             .reset_index()
-             .rename(columns={"成分名稱": "成分串接"}))
-need_medication_grouped=need_medication_grouped.apply(add_rxcui_in_pin_scdc,args=('MIN',),axis=1)
-#先筆記一下，這個方法找出來的MIN只有8個，主要應該是因為MIN的的成分通常沒有鹽基，但TFDA的資料幾乎都有鹽基
-#可能的解決方法
-#1. 用單方查好的IN去找MIN
-#2. 用split把鹽基去掉
+def for_complex_contain(need_medication):
+    #複方應該要用許可證字號做group去分每個group操作
+    need_medication=need_medication[need_medication['單複方']=='複方']
+    need_medication=merge_contain_dose_from_tfda(need_medication)
+    need_medication_grouped = (need_medication.groupby("許可證字號")["成分名稱"]
+                .agg(lambda x: " / ".join(sorted(pd.Series(x).unique(), key=str.lower)))
+                #              分隔字符       不區分大小寫排序   排除重複
+                .reset_index()
+                .rename(columns={"成分名稱": "成分串接"}))
+    need_medication_grouped=need_medication_grouped.apply(add_rxcui_in_pin_scdc,args=('MIN',),axis=1)
+    #先筆記一下，這個方法找出來的MIN只有8個，主要應該是因為MIN的的成分通常沒有鹽基，但TFDA的資料幾乎都有鹽基
+    #可能的解決方法
+    #1. 用單方查好的IN去找MIN
+    #2. 用split把鹽基去掉
