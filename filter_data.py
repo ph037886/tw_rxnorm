@@ -177,4 +177,4 @@ def for_complex_contain(need_medication):
     #   錯誤舉例： 衛署藥輸字第023964號 成分：lidocaine / neomycin / polymyxin B，結果： https://rxnav.nlm.nih.gov/REST/brands?ingredientids=8536+7299+6387
     #   但是這個品項是有四個成分的1089096，成分：bacitracin / lidocaine / neomycin / polymyxin B
     #
-    #   目前覺得：先把單方的IN都先處理好，在merge給複方，複方變成要逐一去查IN PIN MIN
+    #   目前覺得：用單方的方式，把複方的成分都跑出結果，再用RxNav去逐一查品項，產生MIN、SBDC、SCD等
