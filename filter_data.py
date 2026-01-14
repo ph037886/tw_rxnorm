@@ -3,31 +3,43 @@ import sqlite3
 import requests
 from xml.etree import ElementTree
 
-need_medication=pd.read_excel(r'files/健保碼與許可證.xlsx')
+def his_link_licence(need_medication): #HIS藥檔轉許可證字號
+    """need_medication：HIS藥檔
+    
+    HIS藥檔轉許可證字號
+    
+    說明：
+    HIS藥檔需要欄位：'院內碼', '健保碼', '許可證字號_HIS'
+    """
+    #藥檔的資料
+    need_medication=pd.read_excel(r'files/健保碼與許可證.xlsx')
 
-conn=sqlite3.connect(r'files/med_info.db')
+    #政府開放資源的藥品資訊
+    conn=sqlite3.connect(r'files/med_info.db')
 
-sql_nih_to_tfda="""
-SELECT 藥品代號
-, 許可證字號
-, 單複方
-FROM 健保藥品清單"""
+    #政府開放資源中取健保碼、許可證字號、單複方
+    sql_nih_to_tfda="""
+    SELECT 藥品代號 --健保碼
+    , 許可證字號
+    , 單複方
+    FROM 健保藥品清單"""
+    nih_to_tfda=pd.read_sql(sql_nih_to_tfda,conn)
 
-nih_to_tfda=pd.read_sql(sql_nih_to_tfda,conn)
+    #先把許可證字號串起來
+    need_medication=pd.merge(need_medication,nih_to_tfda,how='left',left_on='健保碼', right_on='藥品代號')
 
-#先把許可證字號串起來
-need_medication=pd.merge(need_medication,nih_to_tfda,how='left',left_on='健保碼', right_on='藥品代號')
+    #篩出沒有許可證字號的另外處理，這些可能是自費藥，所以沒有健保碼
+    need_medication2=need_medication[need_medication['許可證字號'].isnull()]
+    #HIS內有建一些許可證字號，看有沒有
+    need_medication2['許可證字號']=need_medication2['許可證字號_HIS']
+    #沒有的話就在篩掉
+    need_medication2=need_medication2[need_medication2['許可證字號']!=' ']
 
-#篩出沒有許可證字號的另外處理
-need_medication[need_medication['許可證字號'].isnull()]
+    #有許可證字號和沒有的合併
+    need_medication=pd.concat([need_medication[~need_medication['許可證字號'].isnull()],need_medication2])
+    return need_medication
 
-need_medication2=need_medication[need_medication['許可證字號'].isnull()]
-need_medication2['許可證字號']=need_medication2['許可證字號_HIS']
-need_medication2=need_medication2[need_medication2['許可證字號']!=' ']
-
-need_medication=pd.concat([need_medication[~need_medication['許可證字號'].isnull()],need_medication2])
-
-def merge_contain_dose_from_tfda(need_medication):
+def merge_contain_dose_from_tfda(need_medication): #把成分、含量、含量單位加回去，這邊要注意有可能一個許可證字號有不同含量
     sql_tfda_to_content="""
     SELECT 成分名稱
     , 成分代碼
@@ -46,8 +58,13 @@ def merge_contain_dose_from_tfda(need_medication):
     return need_medication
 
 
-def find_rxcui(tty_type, keyword):
-    #rxnom sqlite link
+def find_rxcui(tty_type, keyword): #用TTY和學名找RXNORM
+    """tty_type：Rxnorm術語類型，如：IN、PIN、SCDC
+    keyword：藥物學名
+    結果：Dataframe，內容是rxnorm
+    說明
+    rxnom sqlite link
+    這邊使用離線的rxnorm資料庫，這個資料庫的缺點是只有目前還在使用中的處方藥"""
     rxnorm_conn=sqlite3.connect('files/rxnorm_prescribe.db')
     sql_in="""
     SELECT RXCUI
@@ -61,8 +78,13 @@ def find_rxcui(tty_type, keyword):
     return in_df
 
 def add_rxcui_in_pin_scdc(row, tty_type):
+    """
+    row：所需欄位：'成分名稱', '成分串接', '含量', '含量單位'
+    tty_type：Rxnorm術語類型，目前只接受下列tty：IN、PIN、SCDC、MIN
+    給dataframe的apply用，輸出原始的row，另外添加一個column為tty，值為rxnorm的結果。如果沒有資料則返回原來的row
+    """
     if tty_type in row.index.tolist(): #先判斷dataframe的column有沒有tty
-        if row.isna()[tty_type]!=True: #在判斷tty裡面有沒有資料，有的化先不取代，也不做後續
+        if row.isna()[tty_type]!=True: #在判斷tty裡面有沒有資料，有的話先不取代，也不做後續
             row['error']=tty_type + '已存在資料'
             return row
     if tty_type=='SCDC':
@@ -82,7 +104,7 @@ def add_rxcui_in_pin_scdc(row, tty_type):
         keyword=row['成分串接']
     #tty_type='PIN'
     in_df=find_rxcui(tty_type, keyword)
-    if in_df.empty==False:
+    if in_df.empty==False: #有查到資料的狀況下，把column_name用tty命名，內部的值放rxnorm
         row[tty_type]= in_df['RXCUI'].iloc[0]
     return row
 
@@ -100,14 +122,16 @@ def get_text_using_node_from_url(url: str, node: str):
 def find_without_rxnorm_db(row):
     #沒有資料才做
     if (row.isna()['IN']==True) & (row.isna()['PIN']==True) & (row.isna()['SCDC']==True):
+        #IN、PIN、SCDC沒有資料再作
         keyword=row['成分名稱']
-        #依規則文字處理
+        #依API的規則文字處理，如果有鹽基本來是用空格分開，要改用+
         keyword=keyword.replace(' ', '+')
-        #解析XML部分代處理
+        #findRxcuiByString
         get_rxcui=f'https://rxnav.nlm.nih.gov/REST/rxcui?name={keyword}&search=1'
         rxcui=get_text_using_node_from_url(get_rxcui,'.//rxnormId')
         if rxcui is not None:
             #有找到rxcui才做下一步
+            #下一步找tty
             get_tty=f'https://rxnav.nlm.nih.gov/REST/rxcui/{rxcui}/properties'
             tty=get_text_using_node_from_url(get_tty,'.//tty')
             row[tty]=rxcui
