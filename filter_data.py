@@ -1,7 +1,12 @@
 import pandas as pd
+import numpy as np
 import sqlite3
 import requests
 from xml.etree import ElementTree
+
+def reuse_dict(keyword):
+    _dict={'search_field_type':['學名', '英文名', '中文名', 'ATC_CODE', '許可證字號', '健保碼']}
+    return _dict[keyword]
 
 def his_link_licence(need_medication): #HIS藥檔轉許可證字號
     """need_medication：HIS藥檔
@@ -40,6 +45,9 @@ def his_link_licence(need_medication): #HIS藥檔轉許可證字號
     return need_medication
 
 def merge_contain_dose_from_tfda(need_medication): #把成分、含量、含量單位加回去，這邊要注意有可能一個許可證字號有不同含量
+    #政府開放資源的藥品資訊
+    conn=sqlite3.connect(r'files/med_info.db')
+    
     sql_tfda_to_content="""
     SELECT 成分名稱
     , 成分代碼
@@ -57,6 +65,50 @@ def merge_contain_dose_from_tfda(need_medication): #把成分、含量、含量�
     need_medication=need_medication.dropna(subset='成分名稱')
     return need_medication
 
+def find_licence_in_tfda(keyword: str, field_type: str, used: bool = True):
+    """
+    藥品關鍵字查詢許可證字號
+    
+    :param keyword: 搜尋關鍵字
+    :param flied_type: 查詢類別
+    :param used: 使用中->True, 停用->False,  預設使用中
+    :return: 說明
+    :rtype: DataFrame
+    """
+    #政府開放資源的藥品資訊
+    conn=sqlite3.connect(r'files/med_info.db')
+    if field_type.lower()=='all':
+        field_type=reuse_dict('search_field_type')
+    else:
+        field_type=[field_type]
+    
+    field_sql_dict={'學名': 'lower(全部藥品許可證.主成分略述) like lower("%_keyword_%")',
+                    '英文名': 'lower(全部藥品許可證.英文品名) like lower("%_keyword_%")',
+                    '中文名': 'lower(全部藥品許可證.中文品名) like lower("%_keyword_%")',
+                    'ATC_CODE': 'lower(ATC_code.代碼) like lower("_keyword_%")',
+                    '許可證字號': 'lower(全部藥品許可證.許可證字號) like lower("%_keyword_%")',
+                    '健保碼': 'lower(健保藥品清單.藥品代號) like ("%_keyword_%")',}
+    result=pd.DataFrame()
+    for type in field_type:
+        sql="""
+        SELECT 全部藥品許可證.許可證字號 許可證字號
+        , 全部藥品許可證.英文品名 英文名
+        , 全部藥品許可證.中文品名 中文名
+        , 全部藥品許可證.主成分略述 學名
+        FROM 全部藥品許可證
+        LEFT JOIN ATC_code ON 全部藥品許可證.許可證字號=ATC_code.許可證字號 
+        LEFT JOIN 健保藥品清單 ON 全部藥品許可證.許可證字號=健保藥品清單.許可證字號 
+        WHERE 
+        """
+        sql=sql+field_sql_dict[type]
+        if used==True:
+            sql=sql+'\n'+"""AND 全部藥品許可證.註銷狀態<>'已廢止'
+                            AND 全部藥品許可證.註銷狀態<>'已註銷'"""
+        sql=sql.replace('_keyword_', keyword)
+        temp=pd.read_sql(sql, conn)
+        result=pd.concat([temp,result])
+        result=result.drop_duplicates(subset=['許可證字號'])
+    return result
 
 def find_rxcui(tty_type, keyword): #用TTY和學名找RXNORM
     """tty_type：Rxnorm術語類型，如：IN、PIN、SCDC
@@ -170,11 +222,13 @@ def for_single_contain(need_medication):
     
     剩餘藥物後續再另外當個案處理
     """
-    need_medication=need_medication[need_medication['單複方']=='單方']
+    #區分單複方
+    #need_medication=need_medication[need_medication['單複方']=='單方']
     #串上FDA的成分與含量資料
     need_medication=merge_contain_dose_from_tfda(need_medication)
+    #這邊要先把column加進去，不然如果查詢結果沒有這些column，在find_without_rxnorm_db會出錯
+    need_medication[['IN', 'PIN', 'SCDC']]=np.nan
 
-    
     need_medication=need_medication.apply(add_rxcui_in_pin_scdc,args=('IN',),axis=1)
     need_medication=need_medication.apply(add_rxcui_in_pin_scdc,args=('PIN',),axis=1)
     need_medication=need_medication.apply(add_rxcui_in_pin_scdc,args=('SCDC',),axis=1)
@@ -185,8 +239,9 @@ def for_single_contain(need_medication):
     #need_medication=pd.read_pickle('files/temp_single_contain.pkl')
 
 def for_complex_contain(need_medication):
+    #區分單複方
+    #need_medication=need_medication[need_medication['單複方']=='複方']
     #複方應該要用許可證字號做group去分每個group操作
-    need_medication=need_medication[need_medication['單複方']=='複方']
     need_medication=merge_contain_dose_from_tfda(need_medication)
     need_medication_grouped = (need_medication.groupby("許可證字號")["成分名稱"]
                 .agg(lambda x: " / ".join(sorted(pd.Series(x).unique(), key=str.lower)))
@@ -194,6 +249,7 @@ def for_complex_contain(need_medication):
                 .reset_index()
                 .rename(columns={"成分名稱": "成分串接"}))
     need_medication_grouped=need_medication_grouped.apply(add_rxcui_in_pin_scdc,args=('MIN',),axis=1)
+    return need_medication
     #筆記一下目前試過的方法
     #1. 把複方的成分串接之後丟上去查MIN，找出來的MIN只有8個，，主要應該是因為MIN的的成分通常沒有鹽基，但TFDA的資料幾乎都有鹽基
     #2. 用FDA api https://lhncbc.nlm.nih.gov/RxNav/APIs/api-RxNorm.getMultiIngredBrand.html
