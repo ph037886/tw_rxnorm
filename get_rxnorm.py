@@ -5,7 +5,11 @@ import requests
 from xml.etree import ElementTree
 
 def reuse_dict(keyword):
-    _dict={'search_field_type':['學名', '英文名', '中文名', 'ATC_CODE', '許可證字號', '健保碼']}
+    """
+    重複用資料：
+    search_field_type：許可證字號查詢時使用的類別選項
+    """
+    _dict={'search_field_type':['英文名', '學名', '中文名', 'ATC_CODE', '許可證字號', '健保碼']}
     return _dict[keyword]
 
 def his_link_licence(need_medication): #HIS藥檔轉許可證字號
@@ -72,7 +76,7 @@ def find_licence_in_tfda(keyword: str, field_type: str, used: bool = True):
     :param keyword: 搜尋關鍵字
     :param flied_type: 查詢類別
     :param used: 使用中->True, 停用->False,  預設使用中
-    :return: 說明
+    :return: 許可證字號, 英文名, 中文名, 學名
     :rtype: DataFrame
     """
     #政府開放資源的藥品資訊
@@ -248,6 +252,7 @@ def for_complex_contain(need_medication):
                 #              分隔字符       不區分大小寫排序   排除重複
                 .reset_index()
                 .rename(columns={"成分名稱": "成分串接"}))
+    need_medication_grouped['MIN']=np.nan
     need_medication_grouped=need_medication_grouped.apply(add_rxcui_in_pin_scdc,args=('MIN',),axis=1)
     return need_medication
     #筆記一下目前試過的方法
