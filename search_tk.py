@@ -8,12 +8,14 @@ def choose_medication(event):
     e=event.widget
     choose_result=e.item(e.identify('item', event.x, event.y), 'text')
     choose_result_dict={'許可證字號':[choose_result]}
-    choose_result_df=pd.DataFrame.from_dict(choose_result_dict)
-    print(choose_result_df)
-    print(get_rxnorm.merge_contain_dose_from_tfda(choose_result_df))
+    print(e.item(e.identify('item', event.x, event.y), 'values'))
+    choose_result_df=pd.DataFrame.from_dict(choose_result_dict) #輸出一個values的set
+    single_contain=get_rxnorm.for_single_contain(choose_result_df)
+    complex_contain=get_rxnorm.for_complex_contain(choose_result_df)
 
 def do_search():
     #result_tree.tag_configure('evenColor', background='lightblue')
+    result_tree.delete(*result_tree.get_children())
     result_df=get_rxnorm.find_licence_in_tfda(keyword.get(), search_type_var.get(), dc_type_var.get())
     column_name=result_df.columns.to_list()
     i=0
@@ -65,5 +67,12 @@ rxnorm_result_frame.pack()
 result_tree=ttk.Treeview(search_result_frame,columns=('english', 'chinese', 'chemical'))
 result_tree.pack()
 result_tree.bind('<Double-1>', choose_medication)
+
+#row0
+tk.Label(rxnorm_result_frame,text='許可證字號：').grid(column=0,row=0,padx=5,pady=5)
+license_text=tk.Entry(rxnorm_result_frame)
+license_text.grid(column=0,row=0,padx=5,pady=5)
+#row1
+tk.Label(rxnorm_result_frame, text='')
 
 root.mainloop()

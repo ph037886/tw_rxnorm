@@ -254,7 +254,7 @@ def for_complex_contain(need_medication):
                 .rename(columns={"成分名稱": "成分串接"}))
     need_medication_grouped['MIN']=np.nan
     need_medication_grouped=need_medication_grouped.apply(add_rxcui_in_pin_scdc,args=('MIN',),axis=1)
-    return need_medication
+    return need_medication_grouped
     #筆記一下目前試過的方法
     #1. 把複方的成分串接之後丟上去查MIN，找出來的MIN只有8個，，主要應該是因為MIN的的成分通常沒有鹽基，但TFDA的資料幾乎都有鹽基
     #2. 用FDA api https://lhncbc.nlm.nih.gov/RxNav/APIs/api-RxNorm.getMultiIngredBrand.html
