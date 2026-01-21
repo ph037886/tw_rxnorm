@@ -6,13 +6,31 @@ import get_rxnorm
 
 def choose_medication(event):
     e=event.widget
-    choose_result=e.item(e.identify('item', event.x, event.y), 'text')
+    choose_result=e.item(e.identify('item', event.x, event.y), 'text') #許可證字號
     choose_result_dict={'許可證字號':[choose_result]}
-    print(e.item(e.identify('item', event.x, event.y), 'values'))
-    choose_result_df=pd.DataFrame.from_dict(choose_result_dict) #輸出一個values的set
+    chooseee_detail=e.item(e.identify('item', event.x, event.y), 'values') #輸出一個values的set，(英文名, 中文名, 學名)
+    choose_result_df=pd.DataFrame.from_dict(choose_result_dict) 
     single_contain=get_rxnorm.for_single_contain(choose_result_df)
     complex_contain=get_rxnorm.for_complex_contain(choose_result_df)
-
+    
+    #以下開始把資料插入
+    #許可證字號
+    tk.Label(rxnorm_result_frame,text=choose_result).grid(column=1,row=0,padx=5,pady=5,sticky='w')
+    #商品名、英文名
+    tk.Label(rxnorm_result_frame,text=chooseee_detail[0]).grid(column=1,row=1,padx=5,pady=5,sticky='w')
+    #中文名
+    tk.Label(rxnorm_result_frame,text=chooseee_detail[1]).grid(column=3,row=1,padx=5,pady=5,sticky='w')
+    #學名 + 劑量
+    chemical_dose=''
+    i=0
+    while i<len(single_contain):
+        print(single_contain.iloc[i])
+        chemical_dose=chemical_dose + single_contain.iloc[i]['成分名稱'] + '\t' + str(float(single_contain.iloc[i]['含量'])) + ' ' + single_contain.iloc[i]['含量單位'] + '\n'
+        i+=1
+    tk.Label(rxnorm_result_frame,text=chemical_dose).grid(column=1,row=2,padx=5,pady=5,sticky='w')
+    print(single_contain)
+    
+    
 def do_search():
     #result_tree.tag_configure('evenColor', background='lightblue')
     result_tree.delete(*result_tree.get_children())
@@ -60,9 +78,9 @@ tk.Checkbutton(top_frame,text='忽略停用藥品',variable=dc_type_var).grid(co
 #main_frame，結果介面
 #在做兩個框架分別接收查詢結果和rxnorm結果
 search_result_frame=tk.LabelFrame(main_frame,text="查詢結果")
-search_result_frame.pack()
+search_result_frame.pack(fill='x')
 rxnorm_result_frame=tk.LabelFrame(main_frame,text="Rxnorm結果")
-rxnorm_result_frame.pack()
+rxnorm_result_frame.pack(fill='both')
 
 result_tree=ttk.Treeview(search_result_frame,columns=('english', 'chinese', 'chemical'))
 result_tree.pack()
@@ -70,9 +88,16 @@ result_tree.bind('<Double-1>', choose_medication)
 
 #row0
 tk.Label(rxnorm_result_frame,text='許可證字號：').grid(column=0,row=0,padx=5,pady=5)
-license_text=tk.Entry(rxnorm_result_frame)
-license_text.grid(column=0,row=0,padx=5,pady=5)
+#license_text=tk.Entry(rxnorm_result_frame)
+#license_text.grid(column=1,row=0,padx=5,pady=5)
 #row1
-tk.Label(rxnorm_result_frame, text='')
+tk.Label(rxnorm_result_frame, text='商品名：').grid(column=0,row=1,padx=5,pady=5)
+tk.Label(rxnorm_result_frame, text='中文名：').grid(column=2,row=1,padx=5,pady=5)
+#row4
+tk.Label(rxnorm_result_frame, text='學名 + 劑量：').grid(column=0,row=2,padx=5,pady=5)
+#row3
+tk.Label(rxnorm_result_frame, text='Rxnorm：').grid(column=0,row=3,padx=5,pady=5)
+#row4
+
 
 root.mainloop()
