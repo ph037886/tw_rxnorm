@@ -21,6 +21,9 @@ def choose_medication(event):
     single_contain=get_rxnorm.for_single_contain(choose_result_df)
     single_contain=single_contain.fillna('')
     complex_contain=get_rxnorm.for_complex_contain(choose_result_df)
+    complex_contain=complex_contain.fillna('')
+    complex_contain=complex_contain[['許可證字號', 'MIN']]
+    single_contain=pd.merge(single_contain,complex_contain,how='left',on='許可證字號')
     
     #以下開始把資料插入
     #許可證字號
@@ -40,22 +43,19 @@ def choose_medication(event):
     tty_chinese=get_rxnorm.reuse_dict('tty_chinese')
     count=1 #計算original_rxnorm的key使用，第0個key是許可證字號
     for tty, chinese in tty_chinese.items():
-        if tty=='MIN':
-            pass
-        else:
-            i=0
-            while i < len(single_contain[tty]):
-                print(single_contain[tty].iloc[i])
-                if single_contain[tty].iloc[i] !='':
-                    key=tk.Entry(rxnorm_result_frame)
-                    key.grid(column=0,row=count,padx=5,pady=5)
-                    value=tk.Entry(rxnorm_result_frame)
-                    value.grid(column=1,row=count,padx=5,pady=5)
-                    original_rxnorm.append((key, value))
-                    key.insert(0, str(single_contain[tty].iloc[i])) #rxcui，rxcui當key，因為rxcui不會重複
-                    value.insert(0, str(tty) + ' (' + str(chinese) + ')')
-                    count+=1
-                i+=1
+        i=0
+        while i < len(single_contain[tty]):
+            print(single_contain[tty].iloc[i])
+            if single_contain[tty].iloc[i] !='':
+                key=tk.Entry(rxnorm_result_frame)
+                key.grid(column=0,row=count,padx=5,pady=5)
+                value=tk.Entry(rxnorm_result_frame)
+                value.grid(column=1,row=count,padx=5,pady=5)
+                original_rxnorm.append((key, value))
+                key.insert(0, str(single_contain[tty].iloc[i])) #rxcui，rxcui當key，因為rxcui不會重複
+                value.insert(0, str(tty) + ' (' + str(chinese) + ')')
+                count+=1
+            i+=1
     print('-'*20)
     for i in original_rxnorm:
         print(i[0].get())
