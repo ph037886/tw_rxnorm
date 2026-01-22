@@ -7,9 +7,14 @@ from xml.etree import ElementTree
 def reuse_dict(keyword):
     """
     重複用資料：
-    search_field_type：許可證字號查詢時使用的類別選項
+    search_field_type：list，許可證字號查詢時使用的類別選項
+    tty_chinese：dict：tty代碼與中文意思
     """
-    _dict={'search_field_type':['英文名', '學名', '中文名', 'ATC_CODE', '許可證字號', '健保碼']}
+    _dict={'search_field_type':['英文名', '學名', '中文名', 'ATC_CODE', '許可證字號', '健保碼'],
+           'tty_chinese':{'IN':'成分',
+                          'PIN':'精確成份',
+                          'SCDC':'成份+劑量',
+                          'MIN':'複方成份'},}
     return _dict[keyword]
 
 def his_link_licence(need_medication): #HIS藥檔轉許可證字號

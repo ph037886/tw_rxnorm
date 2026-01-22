@@ -1,34 +1,65 @@
 import tkinter as tk
 from tkinter import ttk
 import pandas as pd
+import numpy as np
 
 import get_rxnorm
 
+#全域變數集中區
+loop_entry=list()
+#original_rxnorm=dict()
+original_rxnorm=list()
+new_rxnorm=dict()
+
 def choose_medication(event):
+    global original_rxnorm
     e=event.widget
     choose_result=e.item(e.identify('item', event.x, event.y), 'text') #許可證字號
     choose_result_dict={'許可證字號':[choose_result]}
     chooseee_detail=e.item(e.identify('item', event.x, event.y), 'values') #輸出一個values的set，(英文名, 中文名, 學名)
     choose_result_df=pd.DataFrame.from_dict(choose_result_dict) 
     single_contain=get_rxnorm.for_single_contain(choose_result_df)
+    single_contain=single_contain.fillna('')
     complex_contain=get_rxnorm.for_complex_contain(choose_result_df)
     
     #以下開始把資料插入
     #許可證字號
-    tk.Label(rxnorm_result_frame,text=choose_result).grid(column=1,row=0,padx=5,pady=5,sticky='w')
+    tk.Label(choose_result_frame,text=choose_result).grid(column=1,row=0,padx=5,pady=5,sticky='w')
     #商品名、英文名
-    tk.Label(rxnorm_result_frame,text=chooseee_detail[0]).grid(column=1,row=1,padx=5,pady=5,sticky='w')
+    tk.Label(choose_result_frame,text=chooseee_detail[0]).grid(column=1,row=1,padx=5,pady=5,sticky='w')
     #中文名
-    tk.Label(rxnorm_result_frame,text=chooseee_detail[1]).grid(column=3,row=1,padx=5,pady=5,sticky='w')
-    #學名 + 劑量
-    chemical_dose=''
+    tk.Label(choose_result_frame,text=chooseee_detail[1]).grid(column=3,row=1,padx=5,pady=5,sticky='w')
+    
     i=0
     while i<len(single_contain):
         print(single_contain.iloc[i])
-        chemical_dose=chemical_dose + single_contain.iloc[i]['成分名稱'] + '\t' + str(float(single_contain.iloc[i]['含量'])) + ' ' + single_contain.iloc[i]['含量單位'] + '\n'
+        #row4開始
+        tk.Label(choose_result_frame,text=single_contain.iloc[i]['成分名稱']).grid(column=0,row=4+i,padx=5,pady=5,sticky='w')
+        tk.Label(choose_result_frame,text=str(float(single_contain.iloc[i]['含量'])) + ' ' + single_contain.iloc[i]['含量單位']).grid(column=1,row=4+i,padx=5,pady=5,sticky='e')
         i+=1
-    tk.Label(rxnorm_result_frame,text=chemical_dose).grid(column=1,row=2,padx=5,pady=5,sticky='w')
-    print(single_contain)
+    tty_chinese=get_rxnorm.reuse_dict('tty_chinese')
+    count=1 #計算original_rxnorm的key使用，第0個key是許可證字號
+    for tty, chinese in tty_chinese.items():
+        if tty=='MIN':
+            pass
+        else:
+            i=0
+            while i < len(single_contain[tty]):
+                print(single_contain[tty].iloc[i])
+                if single_contain[tty].iloc[i] !='':
+                    key=tk.Entry(rxnorm_result_frame)
+                    key.grid(column=0,row=count,padx=5,pady=5)
+                    value=tk.Entry(rxnorm_result_frame)
+                    value.grid(column=1,row=count,padx=5,pady=5)
+                    original_rxnorm.append((key, value))
+                    key.insert(0, str(single_contain[tty].iloc[i])) #rxcui，rxcui當key，因為rxcui不會重複
+                    value.insert(0, str(tty) + ' (' + str(chinese) + ')')
+                    count+=1
+                i+=1
+    print('-'*20)
+    for i in original_rxnorm:
+        print(i[0].get())
+        print(i[1].get())
     
     
 def do_search():
@@ -79,24 +110,34 @@ tk.Checkbutton(top_frame,text='忽略停用藥品',variable=dc_type_var).grid(co
 #在做兩個框架分別接收查詢結果和rxnorm結果
 search_result_frame=tk.LabelFrame(main_frame,text="查詢結果")
 search_result_frame.pack(fill='x')
+choose_result_frame=tk.LabelFrame(main_frame,text="選擇藥品")
+choose_result_frame.pack(fill='both')
 rxnorm_result_frame=tk.LabelFrame(main_frame,text="Rxnorm結果")
 rxnorm_result_frame.pack(fill='both')
 
+#search_result_frame
 result_tree=ttk.Treeview(search_result_frame,columns=('english', 'chinese', 'chemical'))
 result_tree.pack()
 result_tree.bind('<Double-1>', choose_medication)
 
+#choose_result_frame
 #row0
-tk.Label(rxnorm_result_frame,text='許可證字號：').grid(column=0,row=0,padx=5,pady=5)
-#license_text=tk.Entry(rxnorm_result_frame)
-#license_text.grid(column=1,row=0,padx=5,pady=5)
+tk.Label(choose_result_frame,text='許可證字號：').grid(column=0,row=0,padx=5,pady=5)
 #row1
-tk.Label(rxnorm_result_frame, text='商品名：').grid(column=0,row=1,padx=5,pady=5)
-tk.Label(rxnorm_result_frame, text='中文名：').grid(column=2,row=1,padx=5,pady=5)
-#row4
-tk.Label(rxnorm_result_frame, text='學名 + 劑量：').grid(column=0,row=2,padx=5,pady=5)
+tk.Label(choose_result_frame, text='商品名：').grid(column=0,row=1,padx=5,pady=5)
+tk.Label(choose_result_frame, text='中文名：').grid(column=2,row=1,padx=5,pady=5)
+#row2
+tk.Label(choose_result_frame, text='學名 + 劑量：').grid(column=0,row=2,padx=5,pady=5)
 #row3
-tk.Label(rxnorm_result_frame, text='Rxnorm：').grid(column=0,row=3,padx=5,pady=5)
+tk.Label(choose_result_frame, text='學名').grid(column=0,row=3,padx=5,pady=5)
+tk.Label(choose_result_frame, text='劑量').grid(column=1,row=3,padx=5,pady=5)
+
+#rxnorm_result_frame
+#row0
+tk.Label(rxnorm_result_frame, text='Rxnorm代碼').grid(column=0,row=0,padx=5,pady=5)
+tk.Label(rxnorm_result_frame, text='TTY (術語類型)').grid(column=1,row=0,padx=5,pady=5)
+tk.Label(rxnorm_result_frame, text='Rxnorm內容').grid(column=2,row=0,padx=5,pady=5)
+
 #row4
 
 
