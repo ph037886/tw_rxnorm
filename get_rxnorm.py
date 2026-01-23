@@ -120,7 +120,8 @@ def find_licence_in_tfda(keyword: str, field_type: str, used: bool = True):
     return result
 
 def find_rxcui(tty_type, keyword): #用TTY和學名找RXNORM
-    """tty_type：Rxnorm術語類型，如：IN、PIN、SCDC
+    """用TTY和學名找RXNORM
+    tty_type：Rxnorm術語類型，如：IN、PIN、SCDC
     keyword：藥物學名
     結果：Dataframe，內容是rxnorm
     說明
@@ -137,6 +138,22 @@ def find_rxcui(tty_type, keyword): #用TTY和學名找RXNORM
     sql_in=sql_in.replace('tty_type',tty_type)
     in_df=pd.read_sql(sql_in, rxnorm_conn)
     return in_df
+
+def find_drug_name_by_rxnorm_from_rxnorm_db(rxcui: str): #使用離線資料庫，用rxcui找藥名
+    """
+    使用離線資料庫，用rxcui找藥名
+    rxcui：rxcui編碼
+    return str 藥名
+    """
+    rxnorm_conn=sqlite3.connect('files/rxnorm_prescribe.db')
+    sql="""
+    SELECT STR
+    FROM RXNCONSO
+    WHERE RXCUI='<<rxcui>>'"""
+    sql=sql.replace('<<rxcui>>', str(rxcui))
+    df=pd.read_sql(sql, rxnorm_conn)
+    drug_name=df.iloc[0]['STR']
+    return drug_name
 
 def add_rxcui_in_pin_scdc(row, tty_type):
     """
@@ -180,7 +197,17 @@ def get_text_using_node_from_url(url: str, node: str):
     else:
         return None
 
-def find_without_rxnorm_db(row):
+def find_drug_name_by_rxnorm_from_api(rxcui): #使用Rxnorm API，用rxcui找藥名
+    """
+    使用Rxnorm API，用rxcui找藥名
+    rxcui：rxcui編碼
+    return str 藥名
+    """
+    url='https://rxnav.nlm.nih.gov/REST/rxcui/'+str(rxcui)
+    drug_name=get_text_using_node_from_url(url, './/name')
+    return drug_name    
+
+def find_without_rxnorm_db(row): #找不在離線資料庫內的藥
     #沒有資料才做
     if (row.isna()['IN']==True) & (row.isna()['PIN']==True) & (row.isna()['SCDC']==True):
         #IN、PIN、SCDC沒有資料再作
