@@ -152,8 +152,11 @@ def find_drug_name_by_rxnorm_from_rxnorm_db(rxcui: str): #使用離線資料庫�
     WHERE RXCUI='<<rxcui>>'"""
     sql=sql.replace('<<rxcui>>', str(rxcui))
     df=pd.read_sql(sql, rxnorm_conn)
-    drug_name=df.iloc[0]['STR']
-    return drug_name
+    if df.empty==True:
+        return None
+    else:
+        drug_name=df.iloc[0]['STR']
+        return drug_name
 
 def add_rxcui_in_pin_scdc(row, tty_type):
     """
@@ -295,3 +298,18 @@ def for_complex_contain(need_medication):
     #   但是這個品項是有四個成分的1089096，成分：bacitracin / lidocaine / neomycin / polymyxin B
     #
     #   目前覺得：用單方的方式，把複方的成分都跑出結果，再用RxNav去逐一查品項，產生MIN、SBDC、SCD等
+    
+def find_drug_name_use_rxcui(rxcui: str):
+    """
+    用rxcui找藥名，先用離線資料庫，再用Rxnorm api，若無特定需求優先用這個
+    
+    :param rxcui: rxnorm編碼
+    :type rxcui: str
+    
+    return 藥名，若查無資料會回傳None
+    """
+    drug_name=find_drug_name_by_rxnorm_from_rxnorm_db(rxcui)
+    if drug_name==None:
+        return find_drug_name_by_rxnorm_from_api(rxcui)
+    else:
+        return drug_name

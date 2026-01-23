@@ -47,13 +47,21 @@ def choose_medication(event):
         while i < len(single_contain[tty]):
             print(single_contain[tty].iloc[i])
             if single_contain[tty].iloc[i] !='':
-                key=tk.Entry(rxnorm_result_frame)
+                rxcui=str(single_contain[tty].iloc[i]) 
+                key=tk.Entry(rxnorm_result_frame) 
                 key.grid(column=0,row=count,padx=5,pady=5)
                 value=tk.Entry(rxnorm_result_frame)
                 value.grid(column=1,row=count,padx=5,pady=5)
                 original_rxnorm.append((key, value))
-                key.insert(0, str(single_contain[tty].iloc[i])) #rxcui，rxcui當key，因為rxcui不會重複
+                key.insert(0, rxcui) 
                 value.insert(0, str(tty) + ' (' + str(chinese) + ')')
+                drug_name_entry=tk.Entry(rxnorm_result_frame)
+                drug_name_entry.grid(column=2,row=count,padx=5,pady=5)
+                drug_name=get_rxnorm.find_drug_name_use_rxcui(rxcui)
+                if drug_name==None: #應該是不會發生
+                    drug_name_entry.insert(0, '')
+                else: 
+                    drug_name_entry.insert(0, drug_name)
                 count+=1
             i+=1
     print('-'*20)
@@ -78,17 +86,19 @@ def do_search():
 
 root=tk.Tk()
 
+root.title('台灣藥品查詢Rxnorm系統')
+
 #Frame集中
 top_frame=tk.Frame(root)
-top_frame.pack()
+top_frame.pack(fill='x')
 main_frame=tk.Frame(root)
-main_frame.pack()
+main_frame.pack(fill='x')
 tail_frame=tk.Frame(root)
-tail_frame.pack()
+tail_frame.pack(fill='x')
 
 #top_frame，查詢介面
 #row0
-tk.Label(top_frame,text='Rxnorm查詢系統').grid(column=0,row=0,padx=5,pady=5)
+tk.Label(top_frame,text='台灣藥品查詢Rxnorm系統').grid(column=0,row=0,padx=5,pady=5, sticky='e')
 #row1
 tk.Label(top_frame,text='類別：').grid(column=0,row=1,padx=5,pady=5)
 search_type_var=tk.StringVar()
