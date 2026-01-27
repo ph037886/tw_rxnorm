@@ -35,7 +35,6 @@ def choose_medication(event):
     
     i=0
     while i<len(single_contain):
-        print(single_contain.iloc[i])
         #row4開始
         tk.Label(choose_result_frame,text=single_contain.iloc[i]['成分名稱']).grid(column=0,row=4+i,padx=5,pady=5,sticky='w')
         tk.Label(choose_result_frame,text=str(float(single_contain.iloc[i]['含量'])) + ' ' + single_contain.iloc[i]['含量單位']).grid(column=1,row=4+i,padx=5,pady=5,sticky='e')
@@ -45,7 +44,6 @@ def choose_medication(event):
     for tty, chinese in tty_chinese.items():
         i=0
         while i < len(single_contain[tty]):
-            print(single_contain[tty].iloc[i])
             if single_contain[tty].iloc[i] !='':
                 rxcui=str(single_contain[tty].iloc[i]) 
                 key=tk.Entry(rxnorm_result_frame) 
@@ -63,14 +61,9 @@ def choose_medication(event):
                 else: 
                     drug_name_entry.insert(0, drug_name)
                 count+=1
-            i+=1
-    print('-'*20)
-    for i in original_rxnorm:
-        print(i[0].get())
-        print(i[1].get())
+            i+=1    
     
-    
-def do_search():
+def do_search(event=None):
     #result_tree.tag_configure('evenColor', background='lightblue')
     result_tree.delete(*result_tree.get_children())
     result_df=get_rxnorm.find_licence_in_tfda(keyword.get(), search_type_var.get(), dc_type_var.get())
@@ -111,6 +104,7 @@ search_type.current(0)
 tk.Label(top_frame,text='關鍵字：').grid(column=2,row=1,padx=5,pady=5)
 keyword=tk.Entry(top_frame)
 keyword.grid(column=3,row=1,padx=5,pady=5)
+keyword.bind('<Return>', do_search)
 ttk.Button(top_frame,text='搜尋',command=do_search).grid(column=4,row=1,padx=5,pady=5)
 #row3
 dc_type_var=tk.BooleanVar()

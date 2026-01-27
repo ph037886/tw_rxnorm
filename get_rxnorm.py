@@ -4,6 +4,14 @@ import sqlite3
 import requests
 from xml.etree import ElementTree
 
+def link_record_db():
+    conn=sqlite3.connect(r'files/record.db')
+    return conn
+
+def link_fda_db():
+    conn=sqlite3.connect(r'files/med_info.db')
+    return conn
+
 def reuse_dict(keyword):
     """
     重複用資料：
@@ -17,6 +25,17 @@ def reuse_dict(keyword):
                           'MIN':'複方成份'},}
     return _dict[keyword]
 
+def str_replace_from_dict(old_str: str, replace_dict: dict):
+    """
+    當SQL有比較多參數要取代時，用字典迴圈去取代，要注意次序性，不要讓後面的字去取代前面的，例如：先取代成"all_word"，又要取代另一個"word"
+    old_str: 原始字串
+    replace_dict: 替代文字的字典，{本來的字: 要取代的字}
+    return 替換完的文字
+    """
+    for key, value in replace_dict.items():
+        old_str=old_str.replace(key, value)
+    return old_str
+
 def his_link_licence(need_medication): #HIS藥檔轉許可證字號
     """need_medication：HIS藥檔
     
@@ -29,7 +48,7 @@ def his_link_licence(need_medication): #HIS藥檔轉許可證字號
     need_medication=pd.read_excel(r'files/健保碼與許可證.xlsx')
 
     #政府開放資源的藥品資訊
-    conn=sqlite3.connect(r'files/med_info.db')
+    conn=link_fda_db()
 
     #政府開放資源中取健保碼、許可證字號、單複方
     sql_nih_to_tfda="""
@@ -55,7 +74,7 @@ def his_link_licence(need_medication): #HIS藥檔轉許可證字號
 
 def merge_contain_dose_from_tfda(need_medication): #把成分、含量、含量單位加回去，這邊要注意有可能一個許可證字號有不同含量
     #政府開放資源的藥品資訊
-    conn=sqlite3.connect(r'files/med_info.db')
+    conn=link_fda_db()
     
     sql_tfda_to_content="""
     SELECT 成分名稱
@@ -85,7 +104,7 @@ def find_licence_in_tfda(keyword: str, field_type: str, used: bool = True):
     :rtype: DataFrame
     """
     #政府開放資源的藥品資訊
-    conn=sqlite3.connect(r'files/med_info.db')
+    conn=link_fda_db()
     if field_type.lower()=='all':
         field_type=reuse_dict('search_field_type')
     else:
@@ -208,7 +227,26 @@ def find_drug_name_by_rxnorm_from_api(rxcui): #使用Rxnorm API，用rxcui找藥
     """
     url='https://rxnav.nlm.nih.gov/REST/rxcui/'+str(rxcui)
     drug_name=get_text_using_node_from_url(url, './/name')
-    return drug_name    
+    return drug_name
+
+def record_drug_name_without_db(rxcui: str, drug_name: str):
+    """
+    把沒有在fda離線資料庫內的藥品名稱，建立一個檔，避免未來每次查詢都要重複連線API
+    rxcui：rxcui編碼
+    drug_name：rxcui對應的藥名
+    """
+    record_conn=link_record_db()
+    sql="""
+    INSERT INTO RXNORM_NAME (RN_RXCUI, RN_RXCUI_NAME)
+    VALUES ('<rxcui>', '<drug_name>')"""
+    replace_dict={'<rxcui>': rxcui,
+                  '<drug_name>': drug_name}
+    sql=str_replace_from_dict(sql, replace_dict)
+    cursor=record_conn.cursor()
+    cursor.execute(sql)
+    record_conn.commit()
+    cursor.close()
+    record_conn.close()
 
 def find_without_rxnorm_db(row): #找不在離線資料庫內的藥
     #沒有資料才做
@@ -310,6 +348,9 @@ def find_drug_name_use_rxcui(rxcui: str):
     """
     drug_name=find_drug_name_by_rxnorm_from_rxnorm_db(rxcui)
     if drug_name==None:
-        return find_drug_name_by_rxnorm_from_api(rxcui)
+        drug_name=find_drug_name_by_rxnorm_from_api(rxcui)
+        if drug_name!=None:
+            record_drug_name_without_db(rxcui, drug_name)
     else:
-        return drug_name
+        pass
+    return drug_name
