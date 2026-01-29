@@ -354,3 +354,15 @@ def find_drug_name_use_rxcui(rxcui: str):
     else:
         pass
     return drug_name
+
+def save_licence_rxcui_in_db(output: dict):
+    record_conn=link_record_db()
+    sql="""
+    INSERT INTO tfda_licence_to_rxnorm (tr_tfda_licence, tr_rxcui, tr_tty)
+    VALUES ('<tr_tfda_licence>', '<tr_rxcui>', '<tr_tty>')"""
+    sql=str_replace_from_dict(sql, output)
+    cursor=record_conn.cursor()
+    cursor.execute(sql)
+    record_conn.commit()
+    cursor.close()
+    record_conn.close()
