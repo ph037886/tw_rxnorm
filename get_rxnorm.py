@@ -355,14 +355,46 @@ def find_drug_name_use_rxcui(rxcui: str):
         pass
     return drug_name
 
-def save_licence_rxcui_in_db(output: dict):
+def save_dict_to_db(output: dict, table_name: str):
+    """
+    把dict的資料型態存到database裡面
+    
+    output: dict，key是要儲存的table的columns名稱，values是值，用list儲存每個值
+    table_name: str，資料表名稱
+    """
     record_conn=link_record_db()
-    sql="""
-    INSERT INTO tfda_licence_to_rxnorm (tr_tfda_licence, tr_rxcui, tr_tty)
-    VALUES ('<tr_tfda_licence>', '<tr_rxcui>', '<tr_tty>')"""
-    sql=str_replace_from_dict(sql, output)
-    cursor=record_conn.cursor()
-    cursor.execute(sql)
+    record_cur=record_conn.cursor()
+    columns_list=list(output.keys())
+    #output={'CT_TFDA_LICENCE': ['內衛藥輸字第003059號', '內衛藥輸字第003059號'], 'CT_CODE_TYPE': [1, 1], 'CT_CODE': ['8886', '203199']}
+    insert_values=list(zip(*output.values())) #dict裡面的values，依keys，逐一取出組成set，再依每一個做成list
+    columns_name=str()
+    question_mark=str()
+    for i in columns_list:
+        columns_name=columns_name+','+i
+        question_mark=question_mark+',?'
+    
+    #迴圈跑完最前面會是,開頭，把,刪掉
+    columns_name=columns_name[1:]
+    question_mark=question_mark[1:]
+    
+    sql='INSERT INTO '+ table_name+'('+columns_name+') VALUES ('+question_mark+')'
+
+    
+    duplicates = [] #紀錄重複值
+
+    for row in insert_values:
+        try:
+            record_cur.execute(sql, row)
+        except sqlite3.IntegrityError: #重複錯誤發生時
+            duplicates.append(row)
+        except Exception as e: #其他錯誤發生時
+            duplicates.append(e)
+
     record_conn.commit()
-    cursor.close()
+    record_cur.close()
     record_conn.close()
+
+    if len(duplicates)==0: #成功，沒有重複
+        return True, ''
+    else: #失敗，把重複的那些資料傳回去
+        return False, duplicates

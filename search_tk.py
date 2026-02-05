@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import ttk
+from tkinter import messagebox
 import pandas as pd
 import numpy as np
 
@@ -11,7 +12,7 @@ loop_entry=list()
 original_rxnorm=list()
 
 def choose_medication(event):
-    global original_rxnorm
+    global original_rxnorm, choose_result_frame, rxnorm_result_frame
     e=event.widget
     choose_result=e.item(e.identify('item', event.x, event.y), 'text') #許可證字號
     choose_result_dict={'許可證字號':[choose_result]}
@@ -24,7 +25,8 @@ def choose_medication(event):
     complex_contain=complex_contain[['許可證字號', 'MIN']]
     single_contain=pd.merge(single_contain,complex_contain,how='left',on='許可證字號')
     
-    #以下開始把資料插入
+    #以下開始插入許可證資料
+    renew_choose_result_frame()
     #許可證字號
     tk.Label(choose_result_frame,text=choose_result).grid(column=1,row=0,padx=5,pady=5,sticky='w')
     #商品名、英文名
@@ -36,10 +38,16 @@ def choose_medication(event):
     while i<len(single_contain):
         #row4開始
         tk.Label(choose_result_frame,text=single_contain.iloc[i]['成分名稱']).grid(column=0,row=4+i,padx=5,pady=5,sticky='w')
-        tk.Label(choose_result_frame,text=str(float(single_contain.iloc[i]['含量'])) + ' ' + single_contain.iloc[i]['含量單位']).grid(column=1,row=4+i,padx=5,pady=5,sticky='e')
+        try:
+            tk.Label(choose_result_frame,text=str(float(single_contain.iloc[i]['含量'])) + ' ' + single_contain.iloc[i]['含量單位']).grid(column=1,row=4+i,padx=5,pady=5,sticky='e')
+        except ValueError: #含量有些會是空白，要做例外處理
+            tk.Label(choose_result_frame,text=str(single_contain.iloc[i]['含量']) + ' ' + single_contain.iloc[i]['含量單位']).grid(column=1,row=4+i,padx=5,pady=5,sticky='e')
         i+=1
     original_rxnorm=[choose_result] #第0個是許可證字號
     tty_chinese=get_rxnorm.reuse_dict('tty_chinese')
+    
+    #以下開始插入rxnorm資料
+    renew_rxnorm_result_frame()
     count=1 #計算rxnorm_result_frame的grid的row使用
     for tty, chinese in tty_chinese.items():
         i=0
@@ -50,11 +58,9 @@ def choose_medication(event):
                 rxcui=str(single_contain[tty].iloc[i]) 
                 key=tk.Entry(rxnorm_result_frame) 
                 key.grid(column=1,row=count,padx=5,pady=5)
-                value=tk.Entry(rxnorm_result_frame)
-                value.grid(column=2,row=count,padx=5,pady=5)
-                original_rxnorm.append((save_var, key, value)) #是否存檔,Rxcui,tty
-                key.insert(0, rxcui) 
-                value.insert(0, str(tty))
+                tk.Label(rxnorm_result_frame,text=str(tty)).grid(column=2,row=count,padx=5,pady=5)
+                original_rxnorm.append((save_var, key)) #是否存檔,Rxcui
+                key.insert(0, rxcui)
                 tk.Label(rxnorm_result_frame,text='(' + chinese + ')').grid(column=3,row=count,padx=5,pady=5)
                 drug_name_entry=tk.Label(rxnorm_result_frame)
                 drug_name_entry.grid(column=4,row=count,padx=5,pady=5)
@@ -82,19 +88,51 @@ def do_search(event=None):
 
 def save_to_db():
     global original_rxnorm
-    out_rxnorm={'check_save': list(),
-            'tr_tfda_licence': list(),
-            'tr_rxcui': list(),
-            'tr_tty': list(),}
+    out_rxnorm={'CT_TFDA_LICENCE': list(),
+            'CT_CODE_TYPE': list(),
+            'CT_COD': list(),}
     i=1 #0一定是許可證字號
     while i<len(original_rxnorm):
-        out_rxnorm['check_save'].append(original_rxnorm[i][0].get())
-        out_rxnorm['tr_tfda_licence'].append(original_rxnorm[0])
-        out_rxnorm['tr_rxcui'].append(original_rxnorm[i][1].get())
-        out_rxnorm['tr_tty'].append(original_rxnorm[i][2].get())
-        i+=1  
-    print(out_rxnorm)
-    #get_rxnorm.save_licence_rxcui_in_db(output)
+        if original_rxnorm[i][0].get()==True:
+            out_rxnorm['CT_TFDA_LICENCE'].append(original_rxnorm[0])
+            out_rxnorm['CT_CODE_TYPE'].append(1)
+            out_rxnorm['CT_CODE'].append(original_rxnorm[i][1].get())
+        i+=1
+    
+    commit=get_rxnorm.save_dict_to_db(out_rxnorm, 'TFDA_LICENCE_TO_CODE')
+
+def renew_choose_result_frame():
+    global choose_result_frame
+    choose_result_frame.destroy()
+    choose_result_frame=tk.LabelFrame(main_frame,text="選擇藥品")
+    choose_result_frame.pack(fill='both')
+    #choose_result_frame
+    #row0
+    tk.Label(choose_result_frame,text='許可證字號：').grid(column=0,row=0,padx=5,pady=5)
+    #row1
+    tk.Label(choose_result_frame, text='商品名：').grid(column=0,row=1,padx=5,pady=5)
+    tk.Label(choose_result_frame, text='中文名：').grid(column=2,row=1,padx=5,pady=5)
+    #row2
+    tk.Label(choose_result_frame, text='學名 + 劑量：').grid(column=0,row=2,padx=5,pady=5)
+    #row3
+    tk.Label(choose_result_frame, text='學名').grid(column=0,row=3,padx=5,pady=5)
+    tk.Label(choose_result_frame, text='劑量').grid(column=1,row=3,padx=5,pady=5)
+
+def renew_rxnorm_result_frame():
+    global rxnorm_result_frame
+    rxnorm_result_frame.destroy()
+    rxnorm_result_frame=tk.LabelFrame(main_frame,text="Rxnorm結果")
+    rxnorm_result_frame.pack(fill='both')
+    #rxnorm_result_frame
+    #row0
+    tk.Label(rxnorm_result_frame, text='存檔').grid(column=0,row=0,padx=5,pady=5)
+    tk.Label(rxnorm_result_frame, text='Rxnorm代碼').grid(column=1,row=0,padx=5,pady=5)
+    tk.Label(rxnorm_result_frame, text='TTY').grid(column=2,row=0,padx=5,pady=5)
+    tk.Label(rxnorm_result_frame, text='(TTY術語類型)').grid(column=3,row=0,padx=5,pady=5)
+    tk.Label(rxnorm_result_frame, text='Rxnorm內容').grid(column=4,row=0,padx=5,pady=5)
+    ttk.Button(rxnorm_result_frame, text='修改', command=save_to_db).grid(column=5,row=0,padx=5,pady=5)
+
+
 
 root=tk.Tk()
 
@@ -133,38 +171,16 @@ tk.Checkbutton(top_frame,text='忽略停用藥品',variable=dc_type_var).grid(co
 #在做兩個框架分別接收查詢結果和rxnorm結果
 search_result_frame=tk.LabelFrame(main_frame,text="查詢結果")
 search_result_frame.pack(fill='x')
-choose_result_frame=tk.LabelFrame(main_frame,text="選擇藥品")
-choose_result_frame.pack(fill='both')
-rxnorm_result_frame=tk.LabelFrame(main_frame,text="Rxnorm結果")
-rxnorm_result_frame.pack(fill='both')
 
 #search_result_frame
 result_tree=ttk.Treeview(search_result_frame,columns=('english', 'chinese', 'chemical'))
 result_tree.pack()
 result_tree.bind('<Double-1>', choose_medication)
 
-#choose_result_frame
-#row0
-tk.Label(choose_result_frame,text='許可證字號：').grid(column=0,row=0,padx=5,pady=5)
-#row1
-tk.Label(choose_result_frame, text='商品名：').grid(column=0,row=1,padx=5,pady=5)
-tk.Label(choose_result_frame, text='中文名：').grid(column=2,row=1,padx=5,pady=5)
-#row2
-tk.Label(choose_result_frame, text='學名 + 劑量：').grid(column=0,row=2,padx=5,pady=5)
-#row3
-tk.Label(choose_result_frame, text='學名').grid(column=0,row=3,padx=5,pady=5)
-tk.Label(choose_result_frame, text='劑量').grid(column=1,row=3,padx=5,pady=5)
 
-#rxnorm_result_frame
-#row0
-tk.Label(rxnorm_result_frame, text='存檔').grid(column=0,row=0,padx=5,pady=5)
-tk.Label(rxnorm_result_frame, text='Rxnorm代碼').grid(column=1,row=0,padx=5,pady=5)
-tk.Label(rxnorm_result_frame, text='TTY').grid(column=2,row=0,padx=5,pady=5)
-tk.Label(rxnorm_result_frame, text='(TTY術語類型)').grid(column=3,row=0,padx=5,pady=5)
-tk.Label(rxnorm_result_frame, text='Rxnorm內容').grid(column=4,row=0,padx=5,pady=5)
-ttk.Button(rxnorm_result_frame, text='修改', command=save_to_db).grid(column=5,row=0,padx=5,pady=5)
-
-#row4
-
+choose_result_frame=tk.Frame(main_frame)
+rxnorm_result_frame=tk.Frame(main_frame)
+renew_choose_result_frame()
+renew_rxnorm_result_frame()
 
 root.mainloop()
