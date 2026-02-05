@@ -10,9 +10,20 @@ import get_rxnorm
 loop_entry=list()
 #original_rxnorm=dict()
 original_rxnorm=list()
+count=np.nan
+
+def add_rxnorm_record_entry(rxcui):
+    global count, original_rxnorm
+    save_var=tk.BooleanVar(value=True)
+    tk.Checkbutton(rxnorm_result_frame,variable=save_var).grid(column=0,row=count,padx=5,pady=5)
+    key=tk.Entry(rxnorm_result_frame) 
+    key.grid(column=1,row=count,padx=5,pady=5)
+    original_rxnorm.append((save_var, key)) #是否存檔,Rxcui
+    key.insert(0, rxcui)
+    count+=1
 
 def choose_medication(event):
-    global original_rxnorm, choose_result_frame, rxnorm_result_frame
+    global original_rxnorm, choose_result_frame, rxnorm_result_frame, count
     e=event.widget
     choose_result=e.item(e.identify('item', event.x, event.y), 'text') #許可證字號
     choose_result_dict={'許可證字號':[choose_result]}
@@ -53,15 +64,9 @@ def choose_medication(event):
         i=0
         while i < len(single_contain[tty]):
             if single_contain[tty].iloc[i] !='':
-                save_var=tk.BooleanVar(value=True)
-                tk.Checkbutton(rxnorm_result_frame,variable=save_var).grid(column=0,row=count,padx=5,pady=5)
                 rxcui=str(single_contain[tty].iloc[i]) 
-                key=tk.Entry(rxnorm_result_frame) 
-                key.grid(column=1,row=count,padx=5,pady=5)
-                tk.Label(rxnorm_result_frame,text=str(tty)).grid(column=2,row=count,padx=5,pady=5)
-                original_rxnorm.append((save_var, key)) #是否存檔,Rxcui
-                key.insert(0, rxcui)
-                tk.Label(rxnorm_result_frame,text='(' + chinese + ')').grid(column=3,row=count,padx=5,pady=5)
+                tk.Label(rxnorm_result_frame,text=str(tty)).grid(column=2,row=count,padx=5,pady=5) #tty
+                tk.Label(rxnorm_result_frame,text='(' + chinese + ')').grid(column=3,row=count,padx=5,pady=5) #tty的中文
                 drug_name_entry=tk.Label(rxnorm_result_frame)
                 drug_name_entry.grid(column=4,row=count,padx=5,pady=5)
                 drug_name=get_rxnorm.find_drug_name_use_rxcui(rxcui)
@@ -69,9 +74,9 @@ def choose_medication(event):
                     pass
                 else: 
                     drug_name_entry['text']=drug_name
-                count+=1
-            i+=1    
-    
+                add_rxnorm_record_entry(rxcui) #Rxcui的值，放最後的原因是因為裡面的count會在最後+1
+            i+=1
+
 def do_search(event=None):
     #result_tree.tag_configure('evenColor', background='lightblue')
     result_tree.delete(*result_tree.get_children())
@@ -90,7 +95,7 @@ def save_to_db():
     global original_rxnorm
     out_rxnorm={'CT_TFDA_LICENCE': list(),
             'CT_CODE_TYPE': list(),
-            'CT_COD': list(),}
+            'CT_CODE': list(),}
     i=1 #0一定是許可證字號
     while i<len(original_rxnorm):
         if original_rxnorm[i][0].get()==True:
@@ -98,7 +103,7 @@ def save_to_db():
             out_rxnorm['CT_CODE_TYPE'].append(1)
             out_rxnorm['CT_CODE'].append(original_rxnorm[i][1].get())
         i+=1
-    
+    #print(out_rxnorm)
     commit=get_rxnorm.save_dict_to_db(out_rxnorm, 'TFDA_LICENCE_TO_CODE')
 
 def renew_choose_result_frame():
@@ -131,6 +136,7 @@ def renew_rxnorm_result_frame():
     tk.Label(rxnorm_result_frame, text='(TTY術語類型)').grid(column=3,row=0,padx=5,pady=5)
     tk.Label(rxnorm_result_frame, text='Rxnorm內容').grid(column=4,row=0,padx=5,pady=5)
     ttk.Button(rxnorm_result_frame, text='修改', command=save_to_db).grid(column=5,row=0,padx=5,pady=5)
+    ttk.Button(rxnorm_result_frame, text='新增一行', command=lambda: add_rxnorm_record_entry('')).grid(column=6,row=0,padx=5,pady=5)
 
 
 
