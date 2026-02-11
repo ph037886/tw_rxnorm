@@ -377,6 +377,7 @@ def save_dict_to_db(output: dict, table_name: str):
     columns_name=columns_name[1:]
     question_mark=question_mark[1:]
     
+    #sql='INSERT OR IGNORE INTO '+ table_name+'('+columns_name+') VALUES ('+question_mark+')'
     sql='INSERT INTO '+ table_name+'('+columns_name+') VALUES ('+question_mark+')'
 
     
