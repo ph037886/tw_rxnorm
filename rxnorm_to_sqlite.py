@@ -1,4 +1,4 @@
-import sqlite3, csv, os, sys
+import sqlite3, csv
 from pathlib import Path
 
 # 使用方式：python load_rxnorm_to_sqlite.py /path/to/rrf rxnorm_prescribe.db

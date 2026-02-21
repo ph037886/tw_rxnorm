@@ -158,6 +158,24 @@ def find_rxcui(tty_type, keyword): #用TTY和學名找RXNORM
     in_df=pd.read_sql(sql_in, rxnorm_conn)
     return in_df
 
+def find_drug_name_by_rxnorm_from_record_db(rxcui: str): #使用自建資料庫，用rxcui找藥名
+    """
+    使用自建資料庫，用rxcui找藥名
+    rxcui：rxcui編碼
+    return str 藥名
+    """
+    sql="""
+    SELECT rn_rxcui_name
+    FROM rxnorm_name
+    WHERE rn_rxcui='<<rxcui>>'"""
+    sql=sql.replace('<<rxcui>>', str(rxcui))
+    df=pd.read_sql(sql, link_record_db())
+    if df.empty==True:
+        return None
+    else:
+        drug_name=df.iloc[0]['rn_rxcui_name']
+        return drug_name
+
 def find_drug_name_by_rxnorm_from_rxnorm_db(rxcui: str): #使用離線資料庫，用rxcui找藥名
     """
     使用離線資料庫，用rxcui找藥名
@@ -176,6 +194,25 @@ def find_drug_name_by_rxnorm_from_rxnorm_db(rxcui: str): #使用離線資料庫�
     else:
         drug_name=df.iloc[0]['STR']
         return drug_name
+
+def find_tty_by_rxnorm_from_rxnorm_db(rxcui: str): #使用離線資料庫，用rxcui找tty
+    """
+    使用離線資料庫，用rxcui找tty
+    rxcui：rxcui編碼
+    return str tty
+    """
+    rxnorm_conn=sqlite3.connect('files/rxnorm_prescribe.db')
+    sql="""
+    SELECT TTY
+    FROM RXNCONSO
+    WHERE RXCUI='<<rxcui>>'"""
+    sql=sql.replace('<<rxcui>>', str(rxcui))
+    df=pd.read_sql(sql, rxnorm_conn)
+    if df.empty==True:
+        return None
+    else:
+        tty=df.iloc[0]['TTY']
+        return tty
 
 def add_rxcui_in_pin_scdc(row, tty_type):
     """
@@ -219,6 +256,16 @@ def get_text_using_node_from_url(url: str, node: str):
     else:
         return None
 
+def find_tty_by_rxnorm_from_api(rxcui): #使用Rxnorm API，用rxcui找tty
+    """
+    使用Rxnorm API，用rxcui找tty
+    rxcui：rxcui編碼
+    return str tty
+    """
+    url='https://rxnav.nlm.nih.gov/REST/rxcui/'+str(rxcui)+'/property?propName=tty'
+    tty=get_text_using_node_from_url(url, './/propValue')
+    return tty
+
 def find_drug_name_by_rxnorm_from_api(rxcui): #使用Rxnorm API，用rxcui找藥名
     """
     使用Rxnorm API，用rxcui找藥名
@@ -257,13 +304,16 @@ def find_without_rxnorm_db(row): #找不在離線資料庫內的藥
         keyword=keyword.replace(' ', '+')
         #findRxcuiByString
         get_rxcui=f'https://rxnav.nlm.nih.gov/REST/rxcui?name={keyword}&search=1'
-        rxcui=get_text_using_node_from_url(get_rxcui,'.//rxnormId')
-        if rxcui is not None:
-            #有找到rxcui才做下一步
-            #下一步找tty
-            get_tty=f'https://rxnav.nlm.nih.gov/REST/rxcui/{rxcui}/properties'
-            tty=get_text_using_node_from_url(get_tty,'.//tty')
-            row[tty]=rxcui
+        try:
+            rxcui=get_text_using_node_from_url(get_rxcui,'.//rxnormId')
+            if rxcui is not None:
+                #有找到rxcui才做下一步
+                #下一步找tty
+                get_tty=f'https://rxnav.nlm.nih.gov/REST/rxcui/{rxcui}/properties'
+                tty=get_text_using_node_from_url(get_tty,'.//tty')
+                row[tty]=rxcui
+        except Exception as e:
+            row['error']=str(e)
     return row
 
 def fill_in_pin(row):#用PIN和SCDC把IN或PIN加回去
@@ -339,21 +389,37 @@ def for_complex_contain(need_medication):
     
 def find_drug_name_use_rxcui(rxcui: str):
     """
-    用rxcui找藥名，先用離線資料庫，再用Rxnorm api，若無特定需求優先用這個
+    用rxcui找藥名，先用自建資料庫，再用FDA離線資料庫，再用Rxnorm api，若無特定需求優先用這個
     
     :param rxcui: rxnorm編碼
     :type rxcui: str
     
     return 藥名，若查無資料會回傳None
     """
-    drug_name=find_drug_name_by_rxnorm_from_rxnorm_db(rxcui)
+    drug_name=find_drug_name_by_rxnorm_from_record_db(rxcui)
     if drug_name==None:
-        drug_name=find_drug_name_by_rxnorm_from_api(rxcui)
-        if drug_name!=None:
-            record_drug_name_without_db(rxcui, drug_name)
-    else:
-        pass
+        drug_name=find_drug_name_by_rxnorm_from_rxnorm_db(rxcui)
+        if drug_name==None:
+            drug_name=find_drug_name_by_rxnorm_from_api(rxcui)
+            if drug_name!=None:
+                record_drug_name_without_db(rxcui, drug_name)
+        else:
+            pass
     return drug_name
+
+def find_tty_use_rxcui(rxcui: str):
+    """
+    用rxcui找tty，先用離線資料庫，再用Rxnorm api，若無特定需求優先用這個
+    
+    :param rxcui: rxnorm編碼
+    :type rxcui: str
+    
+    return tty，若查無資料會回傳None
+    """
+    tty=find_tty_by_rxnorm_from_rxnorm_db(rxcui)
+    if tty==None:
+        tty=find_tty_by_rxnorm_from_api(rxcui)
+    return tty
 
 def save_dict_to_db(output: dict, table_name: str):
     """
