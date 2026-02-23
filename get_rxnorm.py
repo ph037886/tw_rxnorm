@@ -186,7 +186,7 @@ def find_drug_name_by_rxnorm_from_rxnorm_db(rxcui: str): #使用離線資料庫�
     sql="""
     SELECT STR
     FROM RXNCONSO
-    WHERE RXCUI='<<rxcui>>'"""
+    WHERE CODE='<<rxcui>>'"""
     sql=sql.replace('<<rxcui>>', str(rxcui))
     df=pd.read_sql(sql, rxnorm_conn)
     if df.empty==True:
@@ -205,7 +205,7 @@ def find_tty_by_rxnorm_from_rxnorm_db(rxcui: str): #使用離線資料庫，用r
     sql="""
     SELECT TTY
     FROM RXNCONSO
-    WHERE RXCUI='<<rxcui>>'"""
+    WHERE CODE='<<rxcui>>'"""
     sql=sql.replace('<<rxcui>>', str(rxcui))
     df=pd.read_sql(sql, rxnorm_conn)
     if df.empty==True:
